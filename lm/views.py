@@ -1,114 +1,157 @@
-from rest_framework import viewsets, generics
-from lms.serilazers import (
-    CourseSerializer,
-    LessonSerializer,
-    CourseDetailSerializer,
-    SubscriptionSerializer,
-)
-from django.shortcuts import get_object_or_404
-from lms.models import Course, Lesson, Subscription
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from users.permissions import IsModer, IsOwner
-from lms.paginators import CoursePagination
-from django.http import HttpResponse
-from django.utils.decorators import method_decorator
-from drf_yasg.utils import swagger_auto_schema
-from lms.tasks import send_letter
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, generics, permissions
+
+from lm.models import Course, EducationalModule, Enrollment, Material
+from lm.serializers import CourseSerializer, EducationalModuleSerializer, EnrollmentSerializer, MaterialSerializer
+from users.permissions import IsStudent, IsTeacherOrReadOnly
 
 
-@method_decorator(
-    name="list",
-    decorator=swagger_auto_schema(
-        operation_description="description from swagger_auto_schema via method_decorator"
-    ),
-)
-class CourseViewSet(viewsets.ModelViewSet):
-    serializer_class = CourseSerializer
+# Курсы
+class CourseListView(generics.ListAPIView):
     queryset = Course.objects.all()
-    permission_classes = [AllowAny]
-    pagination_class = CoursePagination
-
-    def get_serializer_class(self):
-        if self.action == "retrieve":
-            return CourseDetailSerializer
-        return CourseSerializer
-
-    def get_permissions(self):
-        if self.action == "create":
-            self.permission_classes = (~IsModer,)
-        elif self.action in ["update", "retrieve"]:
-            self.permission_classes = (IsModer | IsOwner,)
-        if self.action == "destroy":
-            self.permission_classes = (IsModer | IsOwner,)
-
-        return super().get_permissions()
-
-    def perform_create(self, serializer):
-        course = serializer.save()
-        course.owner = self.request.user
-        course.save()
-
-    def perform_update(self, serializer):
-        course = serializer.instance
-
-        subscriptions_list = Subscription.objects.filter(course=course)
-        user_list = [subscription.user.email for subscription in subscriptions_list]
-        for email_user in user_list:
-            send_letter.delay(email_user)
-
-        serializer.save()
+    serializer_class = CourseSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ["title", "teacher"]
+    search_fields = ["title", "description"]
+    ordering_fields = ["created_at", "title"]
 
 
-class LessonCreateAPIView(generics.CreateAPIView):
-    queryset = Lesson.objects.all()
-    serializer_class = LessonSerializer
-    permission_classes = (~IsModer, IsAuthenticated)
+class CourseDetailView(generics.RetrieveAPIView):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class CourseCreateView(generics.CreateAPIView):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+    permission_classes = [IsTeacherOrReadOnly]
 
     def perform_create(self, serializer):
-        lesson = serializer.save()
-        lesson.owner = self.request.user
-        lesson.save()
+        serializer.save(teacher=self.request.user)
 
 
-class LessonListAPIView(generics.ListAPIView):
-    serializer_class = LessonSerializer
-    queryset = Lesson.objects.all()
-    pagination_class = CoursePagination
+class CourseUpdateView(generics.UpdateAPIView):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+    permission_classes = [IsTeacherOrReadOnly]
 
 
-class LessonRetrieveAPIView(generics.RetrieveAPIView):
-    serializer_class = LessonSerializer
-    queryset = Lesson.objects.all()
-    permission_classes = (IsAuthenticated, IsModer | IsOwner)
+class CourseDeleteView(generics.DestroyAPIView):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+    permission_classes = [IsTeacherOrReadOnly]
 
 
-class LessonUpdateAPIView(generics.UpdateAPIView):
-    serializer_class = LessonSerializer
-    queryset = Lesson.objects.all()
-    permission_classes = (IsAuthenticated, IsModer | IsOwner)
+# Образовательные модули
+class EducationalModuleListView(generics.ListAPIView):
+    queryset = EducationalModule.objects.all()
+    serializer_class = EducationalModuleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ["title", "author"]
+    search_fields = ["title", "description"]
+    ordering_fields = ["created_at", "title"]
 
 
-class LessonDestroyAPIView(generics.DestroyAPIView):
-    serializer_class = LessonSerializer
-    queryset = Lesson.objects.all()
-    permission_classes = (IsAuthenticated, IsOwner | ~IsModer)
+class EducationalModuleDetailView(generics.RetrieveAPIView):
+    queryset = EducationalModule.objects.all()
+    serializer_class = EducationalModuleSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 
-class SubscriptionAPIView(generics.CreateAPIView):
-    serializer_class = SubscriptionSerializer
-    queryset = Subscription.objects.all()
-    permission_classes = (IsAuthenticated,)
+class EducationalModuleCreateView(generics.CreateAPIView):
+    queryset = EducationalModule.objects.all()
+    serializer_class = EducationalModuleSerializer
+    permission_classes = [IsTeacherOrReadOnly]
 
-    def post(self, *args, **kwargs):
-        user_id = self.request.user
-        course_id = self.request.data.get("course")
-        course_item = get_object_or_404(Course, id=course_id)
-        sub_item = Subscription.objects.filter(user=user_id, course=course_item)
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
 
-        if sub_item.exists():
-            sub_item.delete()
-            message = "Подписка отключена"
-        else:
-            Subscription.objects.create(user=user_id, course=course_item)
-            message = "Подписка подключена"
-        return HttpResponse({"message": message})
+
+class EducationalModuleUpdateView(generics.UpdateAPIView):
+    queryset = EducationalModule.objects.all()
+    serializer_class = EducationalModuleSerializer
+    permission_classes = [IsTeacherOrReadOnly]
+
+
+class EducationalModuleDeleteView(generics.DestroyAPIView):
+    queryset = EducationalModule.objects.all()
+    serializer_class = EducationalModuleSerializer
+    permission_classes = [IsTeacherOrReadOnly]
+
+
+# Материалы
+class MaterialListView(generics.ListAPIView):
+    queryset = Material.objects.all()
+    serializer_class = MaterialSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class MaterialDetailView(generics.RetrieveAPIView):
+    queryset = Material.objects.all()
+    serializer_class = MaterialSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class MaterialCreateView(generics.CreateAPIView):
+    queryset = Material.objects.all()
+    serializer_class = MaterialSerializer
+    permission_classes = [IsTeacherOrReadOnly]
+
+    def perform_create(self, serializer):
+        serializer.save(uploaded_by=self.request.user)
+
+
+class MaterialUpdateView(generics.UpdateAPIView):
+    queryset = Material.objects.all()
+    serializer_class = MaterialSerializer
+    permission_classes = [IsTeacherOrReadOnly]
+
+
+class MaterialDeleteView(generics.DestroyAPIView):
+    queryset = Material.objects.all()
+    serializer_class = MaterialSerializer
+    permission_classes = [IsTeacherOrReadOnly]
+
+
+# Записи на модули
+class EnrollmentListView(generics.ListAPIView):
+    serializer_class = EnrollmentSerializer
+    permission_classes = [IsStudent]
+
+    def get_queryset(self):
+        return Enrollment.objects.filter(student=self.request.user)
+
+
+class EnrollmentDetailView(generics.RetrieveAPIView):
+    serializer_class = EnrollmentSerializer
+    permission_classes = [IsStudent]
+
+    def get_queryset(self):
+        return Enrollment.objects.filter(student=self.request.user)
+
+
+class EnrollmentCreateView(generics.CreateAPIView):
+    serializer_class = EnrollmentSerializer
+    permission_classes = [IsStudent]
+
+    def perform_create(self, serializer):
+        serializer.save(student=self.request.user)
+
+
+class EnrollmentUpdateView(generics.UpdateAPIView):
+    serializer_class = EnrollmentSerializer
+    permission_classes = [IsStudent]
+
+    def get_queryset(self):
+        return Enrollment.objects.filter(student=self.request.user)
+
+
+class EnrollmentDeleteView(generics.DestroyAPIView):
+    serializer_class = EnrollmentSerializer
+    permission_classes = [IsStudent]
+
+    def get_queryset(self):
+        return Enrollment.objects.filter(student=self.request.user)
