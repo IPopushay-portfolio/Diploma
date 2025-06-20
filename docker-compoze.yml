@@ -1,0 +1,57 @@
+services:
+  web:
+    build: .
+    command: >
+      sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ./.env
+
+  db:
+    image: postgres:16
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - ./.env
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:6
+    restart: on-failure
+
+  celery:
+    build: .
+    command: >
+      bash -c "celery -A config worker -l INFO --concurrency=500 --pool=gevent"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - db
+
+
+  celery_beat:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    command: >
+      bash -c "poetry run celery -A config beat --loglevel=info"
+    depends_on:
+      - redis
+      - db
+
+volumes:
+  postgres_data:
+  static_volume:
