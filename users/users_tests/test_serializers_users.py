@@ -2,7 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from lm.models import Course, EducationalModule, Enrollment
+from lm.models import Course, EducationalModule
 
 from ..serializers import CustomUserCreateSerializer, CustomUserSerializer
 
