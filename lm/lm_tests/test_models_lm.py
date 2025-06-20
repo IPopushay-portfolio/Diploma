@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.test import TestCase
 
 from lm.models import Course, EducationalModule, Enrollment, Material
@@ -26,32 +27,45 @@ class EducationalModuleModelTest(TestCase):
 
     def test_unique_order_number(self):
         """Тест уникальности порядкового номера в рамках курса"""
-        module1 = EducationalModule.objects.create(
-            order_number=1, title="Module 1", description="First module", course=self.course, author=self.user
+        # Создаем второй курс для теста
+        second_course = Course.objects.create(
+            title='Second Course',
+            description='Second Course Description',
+            teacher=self.user
         )
 
-        # Проверяем, что модуль создан успешно
-        self.assertEqual(module1.order_number, 1)
-        self.assertEqual(module1.title, "Module 1")
+        # Создаем модуль для первого курса
+        module1 = EducationalModule.objects.create(
+            order_number=1,
+            title='Module 1',
+            description='First module',
+            course=self.course,  # первый курс
+            author=self.user
+        )
 
-        # Пытаемся создать второй модуль с тем же номером
-        with self.assertRaises(ValidationError):
-            module2 = EducationalModule.objects.create(
-                order_number=1, title="Module 2", description="Second module", course=self.course, author=self.user
-            )
-            module2.full_clean()
-
-        # Создаем другой курс для второго модуля
-        course2 = Course.objects.create(title="Test Course 2", description="Test Description 2", teacher=self.user)
-
-        # Теперь создаем модуль с тем же номером, но для другого курса
+        # Создаем модуль с тем же номером для другого курса
         module2 = EducationalModule.objects.create(
             order_number=1,
-            title="Module 2",
-            description="Second module",
-            course=course2,  # другой курс
-            author=self.user,
+            title='Module 2',
+            description='Second module',
+            course=second_course,  # второй курс
+            author=self.user
         )
+
+        # Проверяем, что модули созданы
+        self.assertEqual(module1.order_number, 1)
+        self.assertEqual(module2.order_number, 1)
+        self.assertNotEqual(module1.course, module2.course)
+
+        # Проверяем, что нельзя создать модуль с тем же номером в том же курсе
+        with self.assertRaises(IntegrityError):
+            EducationalModule.objects.create(
+                order_number=1,
+                title='Module 3',
+                description='Third module',
+                course=self.course,  # тот же курс, что и у module1
+                author=self.user
+            )
 
 
 class MaterialModelTest(TestCase):

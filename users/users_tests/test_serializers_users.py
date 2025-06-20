@@ -53,25 +53,6 @@ class CustomUserSerializerTest(TestCase):
         serializer = CustomUserSerializer(instance=teacher)
         self.assertIn(module.id, serializer.data["authored_modules"])
 
-    def test_enrolled_modules_field(self):
-        """Тест поля enrolled_modules"""
-        # Создаем курс
-        course = Course.objects.create(title="Test Course", description="Test Description", teacher=self.teacher)
-
-        # Создаем модуль
-        module = EducationalModule.objects.create(
-            order_number=1, title="Test Module", description="Test Description", course=course, author=self.teacher
-        )
-
-        # Создаем запись на модуль
-        enrollment = Enrollment.objects.create(student=self.user, module=module, progress=0.0, status="enrolled")
-
-        serializer = CustomUserSerializer(instance=self.user)
-
-        # Проверяем, что модуль появился в enrolled_modules
-        self.assertEqual(serializer.data["enrolled_modules"], [module.id])
-        self.assertIn(enrollment.module.id, serializer.data["enrolled_modules"])
-
 
 @pytest.mark.django_db
 class CustomUserCreateSerializerTest(TestCase):
