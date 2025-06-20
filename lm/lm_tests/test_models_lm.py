@@ -29,27 +29,25 @@ class EducationalModuleModelTest(TestCase):
         """Тест уникальности порядкового номера в рамках курса"""
         # Создаем второй курс для теста
         second_course = Course.objects.create(
-            title='Second Course',
-            description='Second Course Description',
-            teacher=self.user
+            title="Second Course", description="Second Course Description", teacher=self.user
         )
 
         # Создаем модуль для первого курса
         module1 = EducationalModule.objects.create(
             order_number=1,
-            title='Module 1',
-            description='First module',
+            title="Module 1",
+            description="First module",
             course=self.course,  # первый курс
-            author=self.user
+            author=self.user,
         )
 
         # Создаем модуль с тем же номером для другого курса
         module2 = EducationalModule.objects.create(
             order_number=1,
-            title='Module 2',
-            description='Second module',
+            title="Module 2",
+            description="Second module",
             course=second_course,  # второй курс
-            author=self.user
+            author=self.user,
         )
 
         # Проверяем, что модули созданы
@@ -61,10 +59,10 @@ class EducationalModuleModelTest(TestCase):
         with self.assertRaises(IntegrityError):
             EducationalModule.objects.create(
                 order_number=1,
-                title='Module 3',
-                description='Third module',
+                title="Module 3",
+                description="Third module",
                 course=self.course,  # тот же курс, что и у module1
-                author=self.user
+                author=self.user,
             )
 
 
