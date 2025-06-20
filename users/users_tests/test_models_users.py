@@ -1,4 +1,4 @@
-# users/tests/test_models.py
+# users/lm_tests/test_models_lm.py
 from django.contrib.auth import get_user_model
 from django.db.utils import IntegrityError
 from django.test import TestCase
